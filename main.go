@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -78,28 +77,16 @@ func himHandler(res http.ResponseWriter, req *http.Request) {
 		fmt.Println("Visiting", r.URL)
 	})
 
+	c.OnScraped(func(r *colly.Response) {
+		fmt.Println("Finished", r.Request.URL)
+	})
+
 	c.Visit(himURL)
 
 	err := json.NewEncoder(res).Encode(dates)
 	if err != nil {
 		http.Error(res, err.Error(), http.StatusInternalServerError)
 	}
-}
-
-func getUrl(url string) ([]byte, error) {
-	resp, err := http.Get(url)
-	if err != nil {
-		return nil, fmt.Errorf("Couldn't make GET request to %s:\n%v", url, err)
-	}
-	body, err := ioutil.ReadAll(resp.Body)
-	defer resp.Body.Close()
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("None 200 response code %v from %s:\n%s", resp.StatusCode, url, body)
-	}
-	return body, nil
 }
 
 func parseTS(dateString string) (time.Time, error) {
@@ -114,7 +101,7 @@ func parseTS(dateString string) (time.Time, error) {
 		return time.Time{}, fmt.Errorf("could not find %s in months map", parts[1])
 	}
 	ts := time.Date(now.Year(), month, date, 0, 0, 0, 0, loc)
-	if ts.Before(now) {
+	if ts.Before(now.AddDate(0, 6, 0)) {
 		ts = ts.AddDate(1, 0, 0)
 	}
 	return ts, nil
