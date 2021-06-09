@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/blendle/zapdriver"
 	"github.com/gocolly/colly"
 )
 
@@ -17,7 +18,6 @@ const (
 	himURL = "https://him.as/tommekalender/?eiendomId=aa1582e2-6d78-4109-b844-2d6c6292c9fe"
 )
 
-var loc *time.Location
 var months = map[string]time.Month{
 	"januar":    time.January,
 	"februar":   time.February,
@@ -39,27 +39,39 @@ type HIM struct {
 }
 
 func init() {
-	var err error
-	loc, err = time.LoadLocation("Europe/Oslo")
-	if err != nil {
-		panic(err)
-	}
 }
 
 func main() {
+	structuredLogger, _ := zapdriver.NewProduction()
+	defer structuredLogger.Sync() // flushes buffer, if any
+	logger := structuredLogger.Sugar()
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		dates := getGarbagePickupDates(himURL)
-
-		err := json.NewEncoder(w).Encode(dates)
+		dates, err := getPickUp(r.Context())
 		if err != nil {
+			logger.Errorf("Failed to get pick up dates from storage: %v", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		err = json.NewEncoder(w).Encode(dates)
+		if err != nil {
+			logger.Errorf("Failed to marshal pick up dates: %v", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	})
 
 	http.HandleFunc("/trigger", func(w http.ResponseWriter, r *http.Request) {
-
+		dates := getGarbagePickupDates(himURL)
+		if len(dates) == 0 {
+			logger.Errorf("Failed to get pick up dates.")
+			http.Error(w, "Failed to get pick up dates.", http.StatusInternalServerError)
+			return
+		}
+		err := storePickUp(r.Context(), dates)
+		if err != nil {
+			logger.Errorf("Failed to store pick up dates: %v", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 	})
 
 	port := os.Getenv("PORT")
@@ -108,8 +120,8 @@ func parseTS(dateString string) (time.Time, error) {
 	if !ok {
 		return time.Time{}, fmt.Errorf("could not find %s in months map", parts[1])
 	}
-	ts := time.Date(now.Year(), month, date, 0, 0, 0, 0, loc)
-	if ts.Before(now.AddDate(0, 6, 0)) {
+	ts := time.Date(now.Year(), month, date, 0, 0, 0, 0, time.UTC)
+	if ts.AddDate(0, 6, 0).Before(now) {
 		ts = ts.AddDate(1, 0, 0)
 	}
 	return ts, nil
