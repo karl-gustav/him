@@ -47,7 +47,20 @@ func init() {
 }
 
 func main() {
-	http.HandleFunc("/", himHandler)
+
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		dates := getGarbagePickupDates(himURL)
+
+		err := json.NewEncoder(w).Encode(dates)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	})
+
+	http.HandleFunc("/trigger", func(w http.ResponseWriter, r *http.Request) {
+
+	})
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -57,8 +70,7 @@ func main() {
 	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
 
-func himHandler(res http.ResponseWriter, req *http.Request) {
-	res.Header().Set("Access-Control-Allow-Origin", "*")
+func getGarbagePickupDates(URL string) []HIM {
 	c := colly.NewCollector()
 	var dates []HIM
 
@@ -81,12 +93,8 @@ func himHandler(res http.ResponseWriter, req *http.Request) {
 		fmt.Println("Finished", r.Request.URL)
 	})
 
-	c.Visit(himURL)
-
-	err := json.NewEncoder(res).Encode(dates)
-	if err != nil {
-		http.Error(res, err.Error(), http.StatusInternalServerError)
-	}
+	c.Visit(URL)
+	return dates
 }
 
 func parseTS(dateString string) (time.Time, error) {
