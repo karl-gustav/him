@@ -12,16 +12,6 @@ const (
 	gcpProject       = "my-cloud-collection"
 )
 
-var loc *time.Location
-
-func init() {
-	var err error
-	loc, err = time.LoadLocation("Europe/Oslo")
-	if err != nil {
-		panic(err)
-	}
-}
-
 func storePickUp(ctx context.Context, data []HIM) error {
 	client, err := firestore.NewClient(ctx, gcpProject)
 	if err != nil {
@@ -36,7 +26,7 @@ func storePickUp(ctx context.Context, data []HIM) error {
 	return err
 }
 
-func getPickUp(ctx context.Context) ([]HIM, error) {
+func getPickUp(ctx context.Context, loc *time.Location) ([]HIM, error) {
 	client, err := firestore.NewClient(ctx, gcpProject)
 	if err != nil {
 		return nil, err

@@ -38,7 +38,14 @@ type HIM struct {
 	NextDate    time.Time `json:"nextDate"`
 }
 
+var loc *time.Location
+
 func init() {
+	var err error
+	loc, err = time.LoadLocation("Europe/Oslo")
+	if err != nil {
+		panic(err)
+	}
 }
 
 func main() {
@@ -48,7 +55,7 @@ func main() {
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		dates, err := getPickUp(r.Context())
+		dates, err := getPickUp(r.Context(), loc)
 		if err != nil {
 			logger.Errorf("Failed to get pick up dates from storage: %v", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -120,7 +127,7 @@ func parseTS(dateString string) (time.Time, error) {
 	if !ok {
 		return time.Time{}, fmt.Errorf("could not find %s in months map", parts[1])
 	}
-	ts := time.Date(now.Year(), month, date, 0, 0, 0, 0, time.UTC)
+	ts := time.Date(now.Year(), month, date, 0, 0, 0, 0, loc)
 	if ts.AddDate(0, 6, 0).Before(now) {
 		ts = ts.AddDate(1, 0, 0)
 	}
