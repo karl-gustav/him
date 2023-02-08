@@ -118,16 +118,24 @@ func getGarbagePickupDates(URL string) []HIM {
 
 func parseTS(dateString string) (time.Time, error) {
 	now := time.Now()
-	parts := strings.Split(dateString, ". ")
-	date, err := strconv.Atoi(parts[0])
+	if dateString == "I dag" {
+		return time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc), nil
+	}
+
+	dayString, monthString, ok := strings.Cut(dateString, ". ")
+	if !ok {
+		return time.Time{}, fmt.Errorf("could not cut datestring `%s`", dateString)
+	}
+
+	day, err := strconv.Atoi(dayString)
 	if err != nil {
 		return time.Time{}, err
 	}
-	month, ok := months[parts[1]]
+	month, ok := months[monthString]
 	if !ok {
-		return time.Time{}, fmt.Errorf("could not find %s in months map", parts[1])
+		return time.Time{}, fmt.Errorf("could not find %s in months map", monthString)
 	}
-	ts := time.Date(now.Year(), month, date, 0, 0, 0, 0, loc)
+	ts := time.Date(now.Year(), month, day, 0, 0, 0, 0, loc)
 	if ts.AddDate(0, 6, 0).Before(now) {
 		ts = ts.AddDate(1, 0, 0)
 	}
