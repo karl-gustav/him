@@ -17,7 +17,7 @@ build: test
 push: build
 	docker push $(CONTAINER_NAME)
 
-deploy: unlock push
+deploy: signin push
 	gcloud beta run deploy $(SERVICE_NAME)\
 		--project $(GPC_PROJECT_ID)\
 		--allow-unauthenticated\
@@ -26,9 +26,6 @@ deploy: unlock push
 		--platform managed\
 		--memory 128Mi\
 		--image $(CONTAINER_NAME)
-
-unlock:
-	lpass sync
 	
 use-latest-version:
 	gcloud alpha run services update-traffic $(SERVICE_NAME)\

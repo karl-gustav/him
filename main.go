@@ -3,15 +3,14 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/blendle/zapdriver"
 	"github.com/gocolly/colly"
+	"github.com/karl-gustav/runlogger"
 )
 
 const (
@@ -39,8 +38,14 @@ type HIM struct {
 }
 
 var loc *time.Location
+var log *runlogger.Logger
 
 func init() {
+	if os.Getenv("K_SERVICE") != "" { // Check if running in cloud run
+		log = runlogger.StructuredLogger()
+	} else {
+		log = runlogger.PlainLogger()
+	}
 	var err error
 	loc, err = time.LoadLocation("Europe/Oslo")
 	if err != nil {
@@ -48,21 +53,20 @@ func init() {
 	}
 }
 
+func init() {
+}
 func main() {
-	structuredLogger, _ := zapdriver.NewProduction()
-	defer structuredLogger.Sync() // flushes buffer, if any
-	logger := structuredLogger.Sugar()
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		dates, err := getPickUp(r.Context(), loc)
 		if err != nil {
-			logger.Errorf("Failed to get pick up dates from storage: %v", err)
+			log.Errorf("Failed to get pick up dates from storage: %v", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		err = json.NewEncoder(w).Encode(dates)
 		if err != nil {
-			logger.Errorf("Failed to marshal pick up dates: %v", err)
+			log.Errorf("Failed to marshal pick up dates: %v", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	})
@@ -70,13 +74,13 @@ func main() {
 	http.HandleFunc("/trigger", func(w http.ResponseWriter, r *http.Request) {
 		dates := getGarbagePickupDates(himURL)
 		if len(dates) == 0 {
-			logger.Errorf("Failed to get pick up dates.")
+			log.Errorf("Failed to get pick up dates.")
 			http.Error(w, "Failed to get pick up dates.", http.StatusInternalServerError)
 			return
 		}
 		err := storePickUp(r.Context(), dates)
 		if err != nil {
-			logger.Errorf("Failed to store pick up dates: %v", err)
+			log.Errorf("Failed to store pick up dates: %v", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	})
@@ -85,8 +89,8 @@ func main() {
 	if port == "" {
 		port = "8080"
 	}
-	log.Println("Serving http://localhost:" + port)
-	log.Fatal(http.ListenAndServe(":"+port, nil))
+	log.Debug("Serving http://localhost:" + port)
+	log.Error(http.ListenAndServe(":"+port, nil))
 }
 
 func getGarbagePickupDates(URL string) []HIM {
