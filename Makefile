@@ -1,6 +1,12 @@
+export DOCKER_BUILDKIT=1
 GPC_PROJECT_ID=my-cloud-collection
 SERVICE_NAME=him
-CONTAINER_NAME=eu.gcr.io/$(GPC_PROJECT_ID)/$(SERVICE_NAME)
+CONTAINER_NAME=europe-west1-docker.pkg.dev/$(GPC_PROJECT_ID)/cloud-run/$(SERVICE_NAME)
+
+.PHONY: *
+
+test:
+	go test ./...
 
 run:
 	@echo 'Run this command:'
@@ -8,8 +14,6 @@ run:
 	PORT=9991\
 	go run .'
 
-test:
-	go test ./...
 
 build: test
 	docker build -t $(CONTAINER_NAME) .
@@ -17,7 +21,7 @@ build: test
 push: build
 	docker push $(CONTAINER_NAME)
 
-deploy: signin push
+deploy: push
 	gcloud beta run deploy $(SERVICE_NAME)\
 		--project $(GPC_PROJECT_ID)\
 		--allow-unauthenticated\
