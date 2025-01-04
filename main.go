@@ -37,8 +37,10 @@ type HIM struct {
 	NextDate    time.Time `json:"nextDate"`
 }
 
-var loc *time.Location
-var log *runlogger.Logger
+var (
+	loc *time.Location
+	log *runlogger.Logger
+)
 
 func init() {
 	if os.Getenv("K_SERVICE") != "" { // Check if running in cloud run
@@ -53,10 +55,7 @@ func init() {
 	}
 }
 
-func init() {
-}
 func main() {
-
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		dates, err := getPickUp(r.Context(), loc)
@@ -74,14 +73,15 @@ func main() {
 	http.HandleFunc("/trigger", func(w http.ResponseWriter, r *http.Request) {
 		dates := getGarbagePickupDates(himURL)
 		if len(dates) == 0 {
-			log.Errorf("Failed to get pick up dates.")
+			log.Warningf("Failed to get pick up dates.")
 			http.Error(w, "Failed to get pick up dates.", http.StatusInternalServerError)
 			return
 		}
 		err := storePickUp(r.Context(), dates)
 		if err != nil {
-			log.Errorf("Failed to store pick up dates: %v", err)
+			log.Error("Failed to store pick up dates", log.Field("error", err))
 			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
 	})
 
@@ -100,7 +100,8 @@ func getGarbagePickupDates(URL string) []HIM {
 	c.OnHTML(".tommekalender__next__content", func(e *colly.HTMLElement) {
 		ts, err := parseTS(e.ChildText(".tommekalender__next__date"))
 		if err != nil {
-			panic(err)
+			log.Error("Failed to find \".tommekalender__next__date\"", log.Field("error", err))
+			return
 		}
 		dates = append(dates, HIM{
 			e.ChildText(".tommekalender__next__heading"),
